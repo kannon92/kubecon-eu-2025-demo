@@ -1,0 +1,11 @@
+apiVersion: scheduling.k8s.io/v1alpha2
+kind: Workload
+metadata:
+  namespace: default
+  name: job-1
+spec:
+  podGroupTemplates:
+    - name: "job-1-template"
+      schedulingPolicy:
+        gang:
+          minCount: 1000

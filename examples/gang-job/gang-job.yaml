@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: no-gang
+spec:
+  parallelism: 10
+  completions: 10
+  completionMode: Indexed
+  template:
+    spec:
+      containers:
+      - name: sleep-container
+        image: quay.io/quay/busybox:latest
+        command: ["sleep", "10000"]
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+      restartPolicy: Never
+  backoffLimit: 4
