@@ -2,7 +2,9 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: no-gang
+  namespace: test
 spec:
+  suspend: false
   parallelism: 10
   completions: 10
   completionMode: Indexed

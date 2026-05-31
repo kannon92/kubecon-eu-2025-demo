@@ -1,0 +1,27 @@
+apiVersion: jobset.x-k8s.io/v1alpha2
+kind: JobSet
+metadata:
+  name: gang-jobset
+spec:
+  replicatedJobs:
+    - name: workers
+      replicas: 1
+      template:
+        spec:
+          parallelism: 1000
+          completions: 1000
+          backoffLimit: 4
+          template:
+            spec:
+              containers:
+              - name: sleep-container
+                image: quay.io/quay/busybox:latest
+                command: ["sleep", "10000"]
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 100Mi
+                  limits:
+                    cpu: 100m
+                    memory: 100Mi
+              restartPolicy: Never

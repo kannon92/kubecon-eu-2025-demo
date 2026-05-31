@@ -1,0 +1,11 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sleep-job
+spec:
+  parallelism: 1000
+  completions: 1000
+    spec:
+      schedulingGroup:
+        podGroupName: job-1-template
+    ...

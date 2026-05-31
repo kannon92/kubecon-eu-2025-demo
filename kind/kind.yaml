@@ -3,7 +3,7 @@ apiVersion: kind.x-k8s.io/v1alpha4
 featureGates:
   GenericWorkload: true
   GangScheduling: true
-  EnableWorkloadWithJob: true
+  TopologyAwareWorkloadScheduling: true
 containerdConfigPatches:
 # Enable CDI as described in
 # https://tags.cncf.io/container-device-interface#containerd-configuration
@@ -36,3 +36,25 @@ nodes:
     nodeRegistration:
       kubeletExtraArgs:
         v: "1"
+- role: worker
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "1"
+- role: worker
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "1"
+- role: worker
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "1"
+
