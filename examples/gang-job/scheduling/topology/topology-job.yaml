@@ -1,0 +1,42 @@
+# A gang Job that must land entirely within a single topology domain (here,
+# a rack). All 4 pods will be scheduled to nodes that share the same value
+# of the topology.kubernetes.io/rack label -- either all on rack1 nodes or
+# all on rack2 nodes, but never split across racks.
+#
+# Prerequisite for this demo: label your worker nodes with a shared rack
+# value, e.g.:
+#   kubectl label node <node-a> <node-b> topology.kubernetes.io/rack=rack1
+#   kubectl label node <node-c> <node-d> topology.kubernetes.io/rack=rack2
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: topology-job
+  namespace: default
+spec:
+  suspend: false
+  parallelism: 4
+  completions: 4
+  completionMode: Indexed
+  backoffLimit: 0
+  scheduling:
+    policy:
+      gang:
+        minCount: 4
+    constraints:
+      topology:
+      - key: topology.kubernetes.io/rack
+  template:
+    spec:
+      terminationGracePeriodSeconds: 0
+      containers:
+      - name: worker
+        image: quay.io/quay/busybox:latest
+        command: ["sleep", "10000"]
+        resources:
+          requests:
+            cpu: "1"
+            memory: 100Mi
+          limits:
+            cpu: "1"
+            memory: 100Mi
+      restartPolicy: Never

@@ -1,0 +1,83 @@
+# NOTE: at the time of writing, the auto-derived Workload/PodGroup that
+# Job.spec.scheduling creates does not yet propagate the pod template's
+# priorityClassName to the PodGroup (it is always created with priority 0).
+# Mixing a non-zero pod priority with the auto-derived PodGroup therefore
+# fails admission ("all pods in a single pod group should have the same
+# priority as the pod group's priority"). Until that gap is closed, priority
+# based gang preemption is done by hand-authoring a Workload + PodGroup (with
+# priorityClassName and disruptionMode set explicitly) and pointing the Job's
+# pods at it with `template.spec.schedulingGroup`, exactly as you would for a
+# JobSet. See ../../bring-your-own-pod-group for the equivalent pattern.
+apiVersion: scheduling.k8s.io/v1alpha3
+kind: Workload
+metadata:
+  name: low-priority-wl
+spec:
+  controllerRef:
+    apiGroup: batch
+    kind: Job
+    name: low-priority-job
+  podGroupTemplates:
+  - name: workers
+    schedulingPolicy:
+      gang:
+        minCount: 4
+---
+apiVersion: scheduling.k8s.io/v1alpha3
+kind: PodGroup
+metadata:
+  name: low-priority-pg
+  namespace: default
+spec:
+  workloadRef:
+    workloadName: low-priority-wl
+    templateName: workers
+  priorityClassName: low-priority
+  # The whole gang is preempted together, instead of pod-by-pod.
+  disruptionMode:
+    all: {}
+  schedulingPolicy:
+    gang:
+      minCount: 4
+---
+# One pod per node (via required pod anti-affinity), each requesting nearly
+# an entire node's CPU. This leaves no room for the high-priority Job in
+# 02-high-priority-job.yaml without preempting this whole gang.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: low-priority-job
+  namespace: default
+spec:
+  suspend: false
+  parallelism: 4
+  completions: 4
+  completionMode: Indexed
+  backoffLimit: 0
+  template:
+    spec:
+      terminationGracePeriodSeconds: 0
+      priorityClassName: low-priority
+      schedulingGroup:
+        podGroupName: low-priority-pg
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: job-name
+                operator: In
+                values: ["low-priority-job"]
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - name: worker
+        image: quay.io/quay/busybox:latest
+        command: ["sleep", "10000"]
+        resources:
+          requests:
+            cpu: "15"
+            memory: 100Mi
+          limits:
+            cpu: "15"
+            memory: 100Mi
+      restartPolicy: Never

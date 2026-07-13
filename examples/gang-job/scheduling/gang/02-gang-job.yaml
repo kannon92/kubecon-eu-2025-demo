@@ -1,0 +1,34 @@
+# The same 4-pod, 3-CPU-per-pod Job, but with native gang scheduling
+# enabled via Job.spec.scheduling. Because only 3 of the 4 nodes have room,
+# the scheduler will not admit any of the pods: the whole group is held back
+# until all 4 pods can start together.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gang-job
+  namespace: default
+spec:
+  suspend: false
+  parallelism: 4
+  completions: 4
+  completionMode: Indexed
+  backoffLimit: 0
+  scheduling:
+    policy:
+      gang:
+        minCount: 4
+  template:
+    spec:
+      terminationGracePeriodSeconds: 0
+      containers:
+      - name: worker
+        image: quay.io/quay/busybox:latest
+        command: ["sleep", "10000"]
+        resources:
+          requests:
+            cpu: "3"
+            memory: 100Mi
+          limits:
+            cpu: "3"
+            memory: 100Mi
+      restartPolicy: Never

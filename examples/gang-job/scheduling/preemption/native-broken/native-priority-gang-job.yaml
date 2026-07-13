@@ -1,0 +1,56 @@
+# THIS EXAMPLE IS EXPECTED TO FAIL. It is kept here deliberately to document
+# a current gap in Job.spec.scheduling (see ../README.md).
+#
+# It looks like the natural way to get a priority-aware gang Job: just set
+# priorityClassName on the pod template alongside scheduling.policy.gang.
+# In practice, the auto-derived Workload/PodGroup created for this Job is
+# always given priority 0, and never inherits priorityClassName from the
+# pod template. Once the PriorityClass admission controller resolves this
+# pod's priority to a non-zero value, every pod fails admission with:
+#
+#   all pods in a single pod group should have the same priority as the
+#   pod group's priority, got 1 and 0
+#
+# ...regardless of available cluster capacity. The Job's pods will sit in
+# Pending forever.
+#
+# Workaround: see ../01-low-priority-job.yaml and ../02-high-priority-job.yaml,
+# which hand-author the Workload/PodGroup (setting priorityClassName
+# explicitly there) and point the Job's pods at it via
+# template.spec.schedulingGroup.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: native-priority-gang
+  namespace: default
+spec:
+  suspend: false
+  parallelism: 4
+  completions: 4
+  completionMode: Indexed
+  backoffLimit: 0
+  scheduling:
+    policy:
+      gang:
+        minCount: 4
+    disruptionMode:
+      all: {}
+  template:
+    spec:
+      terminationGracePeriodSeconds: 0
+      # Setting a non-default priority here is what breaks admission: the
+      # auto-created PodGroup stays at priority 0, causing a permanent
+      # priority mismatch.
+      priorityClassName: low-priority
+      containers:
+      - name: worker
+        image: quay.io/quay/busybox:latest
+        command: ["sleep", "10000"]
+        resources:
+          requests:
+            cpu: "1"
+            memory: 100Mi
+          limits:
+            cpu: "1"
+            memory: 100Mi
+      restartPolicy: Never

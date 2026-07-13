@@ -1,0 +1,95 @@
+# Fills the cluster so that only 3 of the 4 worker nodes have room left for
+# a 3-CPU pod. This sets up the scenario used by the gang scheduling demo:
+# a 4-pod gang needs 4 simultaneous 3-CPU slots, but only 3 are available.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: filler-1
+  namespace: default
+  labels:
+    app: filler
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: kind-worker
+  terminationGracePeriodSeconds: 0
+  containers:
+  - name: filler
+    image: quay.io/quay/busybox:latest
+    command: ["sleep", "10000"]
+    resources:
+      requests:
+        cpu: "12"
+        memory: 100Mi
+      limits:
+        cpu: "12"
+        memory: 100Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: filler-2
+  namespace: default
+  labels:
+    app: filler
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: kind-worker2
+  terminationGracePeriodSeconds: 0
+  containers:
+  - name: filler
+    image: quay.io/quay/busybox:latest
+    command: ["sleep", "10000"]
+    resources:
+      requests:
+        cpu: "12"
+        memory: 100Mi
+      limits:
+        cpu: "12"
+        memory: 100Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: filler-3
+  namespace: default
+  labels:
+    app: filler
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: kind-worker3
+  terminationGracePeriodSeconds: 0
+  containers:
+  - name: filler
+    image: quay.io/quay/busybox:latest
+    command: ["sleep", "10000"]
+    resources:
+      requests:
+        cpu: "12"
+        memory: 100Mi
+      limits:
+        cpu: "12"
+        memory: 100Mi
+---
+# kind-worker4 is filled completely: no room left for any gang pod.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: filler-4
+  namespace: default
+  labels:
+    app: filler
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: kind-worker4
+  terminationGracePeriodSeconds: 0
+  containers:
+  - name: filler
+    image: quay.io/quay/busybox:latest
+    command: ["sleep", "10000"]
+    resources:
+      requests:
+        cpu: "15"
+        memory: 100Mi
+      limits:
+        cpu: "15"
+        memory: 100Mi

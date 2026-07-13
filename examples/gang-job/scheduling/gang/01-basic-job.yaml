@@ -1,0 +1,29 @@
+# A plain Job with no scheduling configuration: standard pod-by-pod
+# scheduling. With only 3 nodes having room for a 3-CPU pod, 3 pods will
+# schedule and run immediately while the 4th sits Pending forever.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: basic-job
+  namespace: default
+spec:
+  suspend: false
+  parallelism: 4
+  completions: 4
+  completionMode: Indexed
+  backoffLimit: 0
+  template:
+    spec:
+      terminationGracePeriodSeconds: 0
+      containers:
+      - name: worker
+        image: quay.io/quay/busybox:latest
+        command: ["sleep", "10000"]
+        resources:
+          requests:
+            cpu: "3"
+            memory: 100Mi
+          limits:
+            cpu: "3"
+            memory: 100Mi
+      restartPolicy: Never

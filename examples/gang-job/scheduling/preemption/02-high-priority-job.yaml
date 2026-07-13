@@ -1,0 +1,72 @@
+apiVersion: scheduling.k8s.io/v1alpha3
+kind: Workload
+metadata:
+  name: high-priority-wl
+spec:
+  controllerRef:
+    apiGroup: batch
+    kind: Job
+    name: high-priority-job
+  podGroupTemplates:
+  - name: workers
+    schedulingPolicy:
+      gang:
+        minCount: 4
+---
+apiVersion: scheduling.k8s.io/v1alpha3
+kind: PodGroup
+metadata:
+  name: high-priority-pg
+  namespace: default
+spec:
+  workloadRef:
+    workloadName: high-priority-wl
+    templateName: workers
+  priorityClassName: high-priority
+  disruptionMode:
+    all: {}
+  schedulingPolicy:
+    gang:
+      minCount: 4
+---
+# Same footprint as the low-priority Job. There is no free capacity left in
+# the cluster, so the scheduler must preempt the entire low-priority gang
+# (disruptionMode: All on that PodGroup) to admit this one.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: high-priority-job
+  namespace: default
+spec:
+  suspend: false
+  parallelism: 4
+  completions: 4
+  completionMode: Indexed
+  backoffLimit: 0
+  template:
+    spec:
+      terminationGracePeriodSeconds: 0
+      priorityClassName: high-priority
+      schedulingGroup:
+        podGroupName: high-priority-pg
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: job-name
+                operator: In
+                values: ["high-priority-job"]
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - name: worker
+        image: quay.io/quay/busybox:latest
+        command: ["sleep", "10000"]
+        resources:
+          requests:
+            cpu: "15"
+            memory: 100Mi
+          limits:
+            cpu: "15"
+            memory: 100Mi
+      restartPolicy: Never
