@@ -1,0 +1,38 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+# NOTE: Do NOT set scheduling-specific feature gates at the cluster level.
+# Kind's top-level `featureGates` field pushes gates to ALL components,
+# including the kubelet, which does not recognize these alpha
+# scheduling.k8s.io gates and fails to start. Enable them only on the
+# apiserver and scheduler via kubeadm extraArgs instead.
+#
+# Use kindest/node:v1.36.1 (or newer) — it is the first published node
+# image that bundles the WAS feature gates (GenericWorkload,
+# GangScheduling, TopologyAwareWorkloadScheduling, WorkloadAwarePreemption)
+# together with DRAWorkloadResourceClaims.
+containerdConfigPatches:
+# Enable CDI so DRA-allocated devices can be injected into containers.
+# https://tags.cncf.io/container-device-interface#containerd-configuration
+- |-
+  [plugins."io.containerd.grpc.v1.cri"]
+    enable_cdi = true
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    apiVersion: kubeadm.k8s.io/v1beta4
+    apiServer:
+      extraArgs:
+        - name: runtime-config
+          value: "scheduling.k8s.io/v1alpha2=true"
+        - name: feature-gates
+          value: "GenericWorkload=true,GangScheduling=true,TopologyAwareWorkloadScheduling=true,WorkloadAwarePreemption=true,DRAWorkloadResourceClaims=true"
+    scheduler:
+      extraArgs:
+        - name: feature-gates
+          value: "GenericWorkload=true,GangScheduling=true,TopologyAwareWorkloadScheduling=true,WorkloadAwarePreemption=true,DRAWorkloadResourceClaims=true"
+- role: worker
+- role: worker
+- role: worker
+- role: worker

@@ -1,0 +1,148 @@
+# The Workload is the declarative template for the CompositePodGroup tree.
+# It describes one replicated training JobSet with two stages:
+#   training-root
+#   ├── data-stage   (basic: can start as soon as its PodGroup is ready)
+#   └── trainer-stage (gang: its child group must be admitted together)
+# training-root is Basic, not Gang: the two stages run sequentially
+# (trainer-stage's pods are only created via dependsOn once data-stage
+# completes), so a Gang policy requiring both stages ready at once would
+# deadlock admission.
+apiVersion: scheduling.k8s.io/v1alpha3
+kind: Workload
+metadata:
+  name: replicated-training
+  namespace: default
+spec:
+  controllerRef:
+    apiGroup: jobset.x-k8s.io
+    kind: JobSet
+    name: replicated-training
+  compositePodGroupTemplates:
+  - name: training-root
+    schedulingPolicy:
+      basic: {}
+    disruptionMode:
+      all: {}
+    compositePodGroupTemplates:
+    - name: data-stage
+      schedulingPolicy:
+        basic: {}
+      disruptionMode:
+        all: {}
+      podGroupTemplates:
+      - name: data-downloaders
+        schedulingPolicy:
+          gang:
+            minCount: 2
+      - name: model-initializers
+        schedulingPolicy:
+          gang:
+            minCount: 2
+    - name: trainer-stage
+      schedulingPolicy:
+        gang:
+          minGroupCount: 1
+      disruptionMode:
+        all: {}
+      podGroupTemplates:
+      - name: trainer-workers
+        schedulingPolicy:
+          gang:
+            # Two MPI launchers plus six workers form the trainer gang.
+            minCount: 8
+---
+# The data stage is deliberately Basic. Its downloaders may be admitted
+# independently, while the parent still includes the stage in the workload's
+# root-level coordination policy.
+apiVersion: scheduling.k8s.io/v1alpha3
+kind: CompositePodGroup
+metadata:
+  name: replicated-training-data
+  namespace: default
+spec:
+  parentCompositePodGroupName: replicated-training-root
+  workloadRef:
+    workloadName: replicated-training
+    templateName: data-stage
+  schedulingPolicy:
+    basic: {}
+  disruptionMode:
+    all: {}
+---
+# The trainer stage is a Gang. Its trainer-workers PodGroup must be schedulable
+# before this stage is admitted.
+apiVersion: scheduling.k8s.io/v1alpha3
+kind: CompositePodGroup
+metadata:
+  name: replicated-training-trainer
+  namespace: default
+spec:
+  parentCompositePodGroupName: replicated-training-root
+  workloadRef:
+    workloadName: replicated-training
+    templateName: trainer-stage
+  schedulingPolicy:
+    gang:
+      minGroupCount: 1
+  disruptionMode:
+    all: {}
+---
+# Root CPG: Basic, since the two stages run sequentially (trainer-stage's
+# pods only appear once data-stage completes via dependsOn). Gang admission
+# here would require both stages ready simultaneously, which can never
+# happen.
+apiVersion: scheduling.k8s.io/v1alpha3
+kind: CompositePodGroup
+metadata:
+  name: replicated-training-root
+  namespace: default
+spec:
+  workloadRef:
+    workloadName: replicated-training
+    templateName: training-root
+  schedulingPolicy:
+    basic: {}
+  disruptionMode:
+    all: {}
+---
+apiVersion: scheduling.k8s.io/v1beta1
+kind: PodGroup
+metadata:
+  name: replicated-training-data-downloaders
+  namespace: default
+spec:
+  parentCompositePodGroupName: replicated-training-data
+  workloadRef:
+    workloadName: replicated-training
+    templateName: data-downloaders
+  schedulingPolicy:
+    gang:
+      minCount: 2
+---
+apiVersion: scheduling.k8s.io/v1beta1
+kind: PodGroup
+metadata:
+  name: replicated-training-model-initializers
+  namespace: default
+spec:
+  parentCompositePodGroupName: replicated-training-data
+  workloadRef:
+    workloadName: replicated-training
+    templateName: model-initializers
+  schedulingPolicy:
+    gang:
+      minCount: 2
+---
+apiVersion: scheduling.k8s.io/v1beta1
+kind: PodGroup
+metadata:
+  name: replicated-training-trainer-workers
+  namespace: default
+spec:
+  parentCompositePodGroupName: replicated-training-trainer
+  workloadRef:
+    workloadName: replicated-training
+    templateName: trainer-workers
+  schedulingPolicy:
+    gang:
+      minCount: 8

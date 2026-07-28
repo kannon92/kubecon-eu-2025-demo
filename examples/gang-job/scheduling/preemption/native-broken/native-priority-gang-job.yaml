@@ -30,7 +30,7 @@ spec:
   completionMode: Indexed
   backoffLimit: 0
   scheduling:
-    policy:
+    schedulingPolicy:
       gang:
         minCount: 4
     disruptionMode:

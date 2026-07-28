@@ -1,14 +1,12 @@
-# The same 4-pod, 3-CPU-per-pod Job, but with native gang scheduling
-# enabled via Job.spec.scheduling. Because only 3 of the 4 nodes have room,
-# the scheduler will not admit any of the pods: the whole group is held back
-# until all 4 pods can start together.
+# Kubernetes 1.37 native Job with the default gang policy and gang-wide
+# disruption. No gang minCount is specified; the Job API applies its default
+# gang size.
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: gang-job
+  name: default-gang-job
   namespace: default
 spec:
-  suspend: false
   parallelism: 4
   completions: 4
   completionMode: Indexed
@@ -16,6 +14,8 @@ spec:
   scheduling:
     schedulingPolicy:
       gang: {}
+    disruptionMode:
+      all: {}
   template:
     spec:
       terminationGracePeriodSeconds: 0

@@ -19,10 +19,9 @@ spec:
   completionMode: Indexed
   backoffLimit: 0
   scheduling:
-    policy:
-      gang:
-        minCount: 4
-    constraints:
+   schedulingPolicy:
+      gang: {}
+   schedulingConstraints:
       topology:
       - key: topology.kubernetes.io/rack
   template:

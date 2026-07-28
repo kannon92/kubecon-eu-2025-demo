@@ -1,0 +1,51 @@
+# Kubernetes 1.37 native Job API: gang scheduling and gang preemption.
+#
+# In 1.37, Job.spec.scheduling carries the scheduling policy and disruption
+# mode directly. The Job controller creates the corresponding Workload and
+# PodGroup, including the pod priority, so no hand-authored Workload or
+# PodGroup is needed.
+#
+# Apply ../preemption/01-low-priority-job.yaml first to provide a lower
+# priority gang for this Job to preempt.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gang-preempting-job
+  namespace: default
+spec:
+  suspend: false
+  parallelism: 4
+  completions: 4
+  completionMode: Indexed
+  backoffLimit: 0
+  scheduling:
+    schedulingPolicy:
+      gang:
+        minCount: 4
+    disruptionMode:
+      all: {}
+  template:
+    spec:
+      terminationGracePeriodSeconds: 0
+      priorityClassName: high-priority
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: job-name
+                operator: In
+                values: ["gang-preempting-job"]
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - name: worker
+        image: quay.io/quay/busybox:latest
+        command: ["sleep", "10000"]
+        resources:
+          requests:
+            cpu: "15"
+            memory: 100Mi
+          limits:
+            cpu: "15"
+            memory: 100Mi
+      restartPolicy: Never

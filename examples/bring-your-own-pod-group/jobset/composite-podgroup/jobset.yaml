@@ -1,0 +1,111 @@
+# A replicated TrainJob represented by a JobSet. The two replicated jobs use
+# different leaf PodGroups, so the CompositePodGroup tree can express the
+# different requirements of the data and trainer stages. dependsOn is used as
+# an execution policy so the trainer stage's ReplicatedJobs are only created
+# once the data stage has completed.
+apiVersion: jobset.x-k8s.io/v1alpha2
+kind: JobSet
+metadata:
+  name: replicated-training
+  namespace: default
+spec:
+  failurePolicy:
+    maxRestarts: 1
+  replicatedJobs:
+  # Two one-pod replicated jobs download and prepare the training data.
+  - name: data-downloader
+    replicas: 2
+    template:
+      spec:
+        completions: 1
+        parallelism: 1
+        backoffLimit: 0
+        template:
+          spec:
+            terminationGracePeriodSeconds: 0
+            schedulingGroup:
+              podGroupName: replicated-training-data-downloaders
+            containers:
+            - name: downloader
+              image: busybox:1.36
+              command: ["/bin/sh", "-c", "echo downloading data; sleep 30"]
+              resources:
+                requests:
+                  cpu: "250m"
+                  memory: "128Mi"
+  # Two model-initialization replicas are also part of the Basic data stage.
+  - name: model-initializer
+    replicas: 2
+    template:
+      spec:
+        completions: 1
+        parallelism: 1
+        backoffLimit: 0
+        template:
+          spec:
+            terminationGracePeriodSeconds: 0
+            schedulingGroup:
+              podGroupName: replicated-training-model-initializers
+            containers:
+            - name: initializer
+              image: busybox:1.36
+              command: ["/bin/sh", "-c", "echo initializing model; sleep 30"]
+              resources:
+                requests:
+                  cpu: "250m"
+                  memory: "128Mi"
+  # Two replicated trainer jobs, each with three workers. The six workers and
+  # two MPI launchers below share a PodGroup with minCount: 8, giving the
+  # trainer stage a strict gang.
+  - name: trainer-launcher
+    replicas: 2
+    # dependsOn enforces the execution order: the trainer stage isn't created
+    # until the data stage (represented here by model-initializer, since
+    # dependsOn currently supports only one dependency per ReplicatedJob)
+    # reports Complete. trainer-launcher and trainer intentionally do NOT
+    # depend on each other: they share one 8-pod gang PodGroup, so both must
+    # be created together or gang admission would deadlock.
+    dependsOn:
+    - name: model-initializer
+      status: Complete
+    template:
+      spec:
+        completions: 1
+        parallelism: 1
+        backoffLimit: 0
+        template:
+          spec:
+            terminationGracePeriodSeconds: 0
+            schedulingGroup:
+              podGroupName: replicated-training-trainer-workers
+            containers:
+            - name: launcher
+              image: busybox:1.36
+              command: ["/bin/sh", "-c", "echo launching MPI training; sleep 30"]
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "256Mi"
+  - name: trainer
+    replicas: 2
+    dependsOn:
+    - name: model-initializer
+      status: Complete
+    template:
+      spec:
+        completions: 3
+        parallelism: 3
+        backoffLimit: 0
+        template:
+          spec:
+            terminationGracePeriodSeconds: 0
+            schedulingGroup:
+              podGroupName: replicated-training-trainer-workers
+            containers:
+            - name: trainer
+              image: busybox:1.36
+              command: ["/bin/sh", "-c", "echo training; sleep 30"]
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "256Mi"
