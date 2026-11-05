@@ -1,0 +1,6 @@
+# LWS v1.0.0: enable native Workload-Aware Scheduling (scheduling.k8s.io/v1beta1 PodGroups/Workloads).
+# Both settings are required; without schedulerProvider the webhook rejects spec.scheduling.
+featureGates:
+  WorkloadAwareScheduling: true
+gangSchedulingManagement:
+  schedulerProvider: kubernetes

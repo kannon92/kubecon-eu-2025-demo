@@ -1,0 +1,51 @@
+# Deliberately create only two members of a three-pod gang.
+# Both should remain unbound until Job parallelism is increased to three.
+apiVersion: scheduling.k8s.io/v1beta1
+kind: PodGroup
+metadata:
+  name: wait-for-members
+  namespace: scheduling-beta-examples
+spec:
+  schedulingPolicy:
+    gang:
+      minCount: 3
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: wait-for-members
+  namespace: scheduling-beta-examples
+spec:
+  parallelism: 2
+  completions: 3
+  completionMode: Indexed
+  backoffLimit: 0
+  activeDeadlineSeconds: 900
+  template:
+    metadata:
+      labels:
+        scheduling-example: wait-for-members
+    spec:
+      schedulingGroup:
+        podGroupName: wait-for-members
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: worker
+        image: docker.io/library/busybox:1.36.1
+        command: ["sh", "-c", "echo Started at $(date -u); sleep 300"]
+        resources:
+          requests:
+            cpu: 100m
+            memory: 32Mi
+          limits:
+            cpu: 200m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]

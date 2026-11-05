@@ -1,0 +1,94 @@
+# JobSet level 2: one gang per ReplicatedJob.
+# launcher -> PodGroup with minCount=1; workers (2 jobs x 2 pods) -> a separate
+# PodGroup with minCount=4. The launcher can schedule even if all 4 workers
+# cannot, but the 4 workers are still admitted all-or-nothing.
+# (Listing several names in one targetReplicatedJobs entry would make them share a gang.)
+apiVersion: jobset.x-k8s.io/v1alpha2
+kind: JobSet
+metadata:
+  name: jobset-level2
+  namespace: scheduling-beta-examples
+spec:
+  successPolicy:
+    operator: All
+  failurePolicy:
+    maxRestarts: 0
+  scheduling:
+    replicatedJobs:
+    - targetReplicatedJobs: ["launcher"]
+      schedulingPolicy:
+        gang: {}
+    - targetReplicatedJobs: ["workers"]
+      schedulingPolicy:
+        gang: {}
+  replicatedJobs:
+  - name: launcher
+    replicas: 1
+    template:
+      spec:
+        parallelism: 1
+        completions: 1
+        completionMode: Indexed
+        backoffLimit: 0
+        activeDeadlineSeconds: 900
+        template:
+          metadata:
+            labels:
+              scheduling-example: jobset-level2
+          spec:
+            restartPolicy: Never
+            securityContext:
+              runAsNonRoot: true
+              seccompProfile:
+                type: RuntimeDefault
+            containers:
+            - name: launcher
+              image: docker.io/library/busybox:1.36.1
+              command: ["sh", "-c", "echo $(hostname) started at $(date -u); sleep 120"]
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 32Mi
+                limits:
+                  cpu: 200m
+                  memory: 64Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+  - name: workers
+    replicas: 2
+    template:
+      spec:
+        parallelism: 2
+        completions: 2
+        completionMode: Indexed
+        backoffLimit: 0
+        activeDeadlineSeconds: 900
+        template:
+          metadata:
+            labels:
+              scheduling-example: jobset-level2
+          spec:
+            restartPolicy: Never
+            securityContext:
+              runAsNonRoot: true
+              seccompProfile:
+                type: RuntimeDefault
+            containers:
+            - name: workers
+              image: docker.io/library/busybox:1.36.1
+              command: ["sh", "-c", "echo $(hostname) started at $(date -u); sleep 120"]
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 32Mi
+                limits:
+                  cpu: 200m
+                  memory: 64Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]

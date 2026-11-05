@@ -1,0 +1,4 @@
+# JobSet v0.13.0: enable native Workload-Aware Scheduling (scheduling.k8s.io/v1beta1 PodGroups/Workloads)
+controller:
+  featureGates:
+    JobSetWorkloadAwareSchedulingAPI: true

@@ -1,0 +1,41 @@
+# LWS native gang scheduling, replica level (the default for `scheduling: {}`).
+# Two replicas x size 3 (1 leader + 2 workers). LWS creates one Workload and
+# one PodGroup per replica with gang.minCount=3, so each leader+workers group
+# is admitted all-or-nothing while the two replicas schedule independently.
+# Requires the LWS feature gate WorkloadAwareScheduling=true.
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: lws-gang
+  namespace: scheduling-beta-examples
+spec:
+  replicas: 2
+  scheduling: {}
+  leaderWorkerTemplate:
+    size: 3
+    workerTemplate:
+      metadata:
+        labels:
+          scheduling-example: lws-gang
+      spec:
+        restartPolicy: Always
+        securityContext:
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        containers:
+        - name: worker
+          image: docker.io/library/busybox:1.36.1
+          command: ["sh", "-c", "echo $(hostname) started at $(date -u); sleep infinity"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
